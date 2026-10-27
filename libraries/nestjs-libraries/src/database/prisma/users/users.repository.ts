@@ -5,7 +5,11 @@ import {
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Provider, Role } from '@prisma/client';
-import { provisionPreshosUser, PreshosIdentity, PreshosMembership } from './preshos-user';
+import {
+  provisionPreshosUser,
+  PreshosIdentity,
+  PreshosMembership,
+} from './preshos-user';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
@@ -15,20 +19,32 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 export class UsersRepository {
   constructor(
     private _user: PrismaRepository<'user'>,
-    private _transaction: PrismaTransaction
+    private _transaction: PrismaTransaction,
   ) {}
 
-  async loginPreshosUser(identity: PreshosIdentity, membership: PreshosMembership) {
+  async loginPreshosUser(
+    identity: PreshosIdentity,
+    membership: PreshosMembership,
+  ) {
     // Serializable transaction + bounded retry prevents duplicate first-login
     // users when callbacks race (including email matches across providers).
     for (let attempt = 0; ; attempt++) {
       try {
         return await this._transaction.model.$transaction(
           (tx) => provisionPreshosUser(tx, identity, membership),
-          { isolationLevel: 'Serializable' }
+          { isolationLevel: 'Serializable' },
         );
       } catch (error) {
-        if (attempt >= 2 || !['P2034', 'P2002'].includes(error?.code)) throw error;
+        const code =
+          error && typeof error === 'object' && 'code' in error
+            ? error.code
+            : undefined;
+        if (
+          attempt >= 2 ||
+          typeof code !== 'string' ||
+          !['P2034', 'P2002'].includes(code)
+        )
+          throw error;
       }
     }
   }

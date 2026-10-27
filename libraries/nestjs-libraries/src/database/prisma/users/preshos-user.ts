@@ -66,6 +66,15 @@ export async function provisionPreshosUser(
       },
     });
   }
+  // WorkOS verified this mailbox; complete pending email activation when
+  // reusing a local account, otherwise the normal auth middleware rejects it.
+  if (user.activated === false) {
+    if (identity.emailVerified !== true) throw denied();
+    user = await tx.user.update({
+      where: { id: user.id },
+      data: { activated: true },
+    });
+  }
   await tx.userOrganization.upsert({
     where: {
       userId_organizationId: { userId: user.id, organizationId: org.id },

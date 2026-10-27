@@ -154,3 +154,19 @@ test('misconfiguration, outages and malformed responses fail closed', async () =
     ).rejects.toThrow('temporarily unavailable');
   }
 });
+
+test('verified email completes pending local email activation', async () => {
+  const tx = database(
+    [],
+    [{ id: 'local-user', providerName: 'LOCAL', activated: false }],
+  );
+  const update = jest
+    .fn()
+    .mockResolvedValue({ id: 'local-user', activated: true });
+  (tx.user as any).update = update;
+  await provisionPreshosUser(tx as any, identity, membership);
+  expect(update).toHaveBeenCalledWith({
+    where: { id: 'local-user' },
+    data: { activated: true },
+  });
+});
