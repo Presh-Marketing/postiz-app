@@ -66,3 +66,10 @@ result in the same delivery. `public/preshos/source.json` records the exact
 PRESHos source commit and hashes. The script copies the canonical app icon and
 favicon and maps PRESHos CSS tokens; it refuses an unexpected font contract.
 Brand assets are bundled and never fetched at runtime from another tenant.
+
+## Branch validation
+
+- 16 focused tests pass across membership, auth-flow and callback suites.
+- Backend TypeScript checks pass.
+- Local browser checks confirm Inter, PRESHos assets and a 390px mobile layout without horizontal overflow.
+- Live WorkOS / Railway acceptance requires the approved rollout above.
