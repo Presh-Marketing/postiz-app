@@ -1,10 +1,10 @@
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/users/users.service',
-  () => ({ UsersService: class {} }),
+  () => ({ UsersService: class {} })
 );
 jest.mock(
   '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service',
-  () => ({ OrganizationService: class {} }),
+  () => ({ OrganizationService: class {} })
 );
 jest.mock('@gitroom/nestjs-libraries/services/email.service', () => ({
   EmailService: class {},
@@ -53,7 +53,7 @@ function service() {
       users as any,
       organizations as any,
       {} as any,
-      { getProvider: () => provider } as any,
+      { getProvider: () => provider } as any
     ),
     users,
     organizations,
@@ -61,8 +61,63 @@ function service() {
   };
 }
 beforeEach(() => {
+  process.env.JWT_SECRET = 'test-only-workspace-choice-signing-secret';
   jest.clearAllMocks();
   jest.mocked(resolvePreshosMembership).mockResolvedValue(membership as any);
+});
+test('multiple tenants require a choice without creating a user or session', async () => {
+  const { auth, users, organizations } = service();
+  const workspaces = [
+    { tenantId: 42, name: 'First' },
+    { tenantId: 84, name: 'Second' },
+  ];
+  jest.mocked(resolvePreshosMembership).mockResolvedValueOnce({ workspaces });
+  const result = await auth.checkExists(
+    'GENERIC',
+    'code',
+    undefined,
+    'nonce',
+    'nonce'
+  );
+  expect(result).toEqual({ workspaces, selectionToken: expect.any(String) });
+  expect(result).not.toHaveProperty('jwt');
+  expect(users.loginPreshosUser).not.toHaveBeenCalled();
+  expect(organizations.createOrgAndUser).not.toHaveBeenCalled();
+  const selected = await auth.selectPreshosWorkspace(
+    (result as any).selectionToken,
+    84,
+    'nonce'
+  );
+  expect(resolvePreshosMembership).toHaveBeenLastCalledWith(
+    identity,
+    undefined,
+    84
+  );
+  expect(selected.addedOrg.organizationId).toBe(membership.postizOrgId);
+  expect(users.loginPreshosUser).toHaveBeenCalledTimes(1);
+});
+test('revoked tenant selection cannot create a user or session', async () => {
+  const { auth, users } = service();
+  jest.mocked(resolvePreshosMembership).mockResolvedValueOnce({
+    workspaces: [
+      { tenantId: 42, name: 'First' },
+      { tenantId: 84, name: 'Second' },
+    ],
+  });
+  const result = await auth.checkExists(
+    'GENERIC',
+    'code',
+    undefined,
+    'nonce',
+    'nonce'
+  );
+  jest
+    .mocked(resolvePreshosMembership)
+    .mockRejectedValueOnce(new Error('membership revoked'));
+  await expect(
+    auth.selectPreshosWorkspace((result as any).selectionToken, 84, 'nonce')
+  ).rejects.toThrow('membership revoked');
+  expect(users.loginPreshosUser).not.toHaveBeenCalled();
 });
 test('OAuth callback provisions both existing and new users before issuing JWT, bypassing company onboarding', async () => {
   const { auth, users, organizations } = service();
@@ -71,7 +126,7 @@ test('OAuth callback provisions both existing and new users before issuing JWT, 
     'code',
     undefined,
     'nonce',
-    'nonce',
+    'nonce'
   );
   expect(result).toEqual({
     jwt: 'signed-jwt',
@@ -80,7 +135,7 @@ test('OAuth callback provisions both existing and new users before issuing JWT, 
   expect(result).not.toHaveProperty('token');
   expect(users.loginPreshosUser).toHaveBeenCalledWith(
     expect.objectContaining(identity),
-    membership,
+    membership
   );
   expect(organizations.createOrgAndUser).not.toHaveBeenCalled();
 });
@@ -91,7 +146,7 @@ test('direct generic login ignores invitation cookie and selects the PRESHos-map
     { providerToken: 'token' } as any,
     '',
     '',
-    { orgId: 'unrelated', role: 'ADMIN', id: 'invite' },
+    { orgId: 'unrelated', role: 'ADMIN', id: 'invite' }
   );
   expect(result.addedOrg).toEqual({ organizationId: membership.postizOrgId });
   expect(organizations.addUserToOrg).not.toHaveBeenCalled();
@@ -102,7 +157,7 @@ test('membership rejection prevents all user/org writes and JWT creation', async
     .mocked(resolvePreshosMembership)
     .mockRejectedValue(new Error('workspace not configured'));
   await expect(
-    auth.checkExists('GENERIC', 'code', undefined, 'nonce', 'nonce'),
+    auth.checkExists('GENERIC', 'code', undefined, 'nonce', 'nonce')
   ).rejects.toThrow('workspace not configured');
   expect(users.loginPreshosUser).not.toHaveBeenCalled();
   expect(organizations.createOrgAndUser).not.toHaveBeenCalled();
@@ -110,7 +165,7 @@ test('membership rejection prevents all user/org writes and JWT creation', async
 test('invalid OAuth state cannot reach the membership service', async () => {
   const { auth } = service();
   await expect(
-    auth.checkExists('GENERIC', 'code', undefined, 'wrong', 'nonce'),
+    auth.checkExists('GENERIC', 'code', undefined, 'wrong', 'nonce')
   ).rejects.toThrow('Invalid state');
   expect(resolvePreshosMembership).not.toHaveBeenCalled();
 });

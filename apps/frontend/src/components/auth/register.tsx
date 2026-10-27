@@ -29,7 +29,7 @@ const WalletProvider = dynamic(
   {
     ssr: false,
     loading: () => <WalletUiProvider />,
-  },
+  }
 );
 type Inputs = {
   email: string;
@@ -46,6 +46,11 @@ export function Register() {
   const [state] = useState(getQuery?.get('state') || '');
   const [show, setShow] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [workspaceChoice, setWorkspaceChoice] = useState<{
+    selectionToken: string;
+    workspaces: Array<{ tenantId: number; name: string }>;
+  }>();
+  const [selectingWorkspace, setSelectingWorkspace] = useState(false);
   useEffect(() => {
     if (provider && code) {
       load();
@@ -58,27 +63,57 @@ export function Register() {
         {
           method: 'POST',
           body: JSON.stringify({ code, state }),
-        },
+        }
       );
       if (!response.ok) {
         setLoginError(
           response.status === 403
             ? "Your workspace isn't set up yet. Ask your PRESHos administrator to check your tenant membership and Social connection."
-            : 'PRESHos sign-in is temporarily unavailable. Please try again.',
+            : 'PRESHos sign-in is temporarily unavailable. Please try again.'
         );
         return;
       }
-      const { token } = await response.json();
+      const { token, workspaces, selectionToken } = await response.json();
+      if (workspaces && selectionToken) {
+        setWorkspaceChoice({ workspaces, selectionToken });
+        return;
+      }
       if (token) {
         setCode(token);
         setShow(true);
       }
     } catch {
       setLoginError(
-        'PRESHos sign-in is temporarily unavailable. Please try again.',
+        'PRESHos sign-in is temporarily unavailable. Please try again.'
       );
     }
   }, [provider, code, state, fetch]);
+  const selectWorkspace = async (tenantId: number) => {
+    if (!workspaceChoice || selectingWorkspace) return;
+    setSelectingWorkspace(true);
+    try {
+      const response = await fetch('/auth/preshos/workspace', {
+        method: 'POST',
+        body: JSON.stringify({
+          tenantId,
+          selectionToken: workspaceChoice.selectionToken,
+        }),
+      });
+      if (!response.ok) {
+        setLoginError(
+          response.status === 403
+            ? 'This workspace is unavailable or your sign-in expired. Please sign in again, or ask your PRESHos administrator to check the Social connection.'
+            : 'PRESHos sign-in is temporarily unavailable. Please try again.'
+        );
+      }
+    } catch {
+      setLoginError(
+        'PRESHos sign-in is temporarily unavailable. Please try again.'
+      );
+    } finally {
+      setSelectingWorkspace(false);
+    }
+  };
   if (!code && !provider) {
     return <RegisterAfter token="" provider="LOCAL" />;
   }
@@ -88,6 +123,27 @@ export function Register() {
         <h1 className="text-xl font-semibold">Unable to sign in</h1>
         <p>{loginError}</p>
         <Link href="/auth/login">Back to sign in</Link>
+      </div>
+    );
+  }
+  if (workspaceChoice) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold">Choose your PRESHos workspace</h1>
+        <p>
+          You belong to more than one workspace. Choose where to manage social
+          content.
+        </p>
+        {workspaceChoice.workspaces.map((workspace) => (
+          <Button
+            key={workspace.tenantId}
+            type="button"
+            disabled={selectingWorkspace}
+            onClick={() => selectWorkspace(workspace.tenantId)}
+          >
+            {workspace.name}
+          </Button>
+        ))}
       </div>
     );
   }
@@ -247,7 +303,7 @@ export function RegisterAfter({
               <div className={clsx('text-[12px]')}>
                 {t(
                   'by_registering_you_agree_to_our',
-                  'By registering you agree to our',
+                  'By registering you agree to our'
                 )}
                 &nbsp;
                 <a
