@@ -29,7 +29,7 @@ const WalletProvider = dynamic(
   {
     ssr: false,
     loading: () => <WalletUiProvider />,
-  }
+  },
 );
 type Inputs = {
   email: string;
@@ -45,28 +45,51 @@ export function Register() {
   const [code, setCode] = useState(getQuery?.get('code') || '');
   const [state] = useState(getQuery?.get('state') || '');
   const [show, setShow] = useState(false);
+  const [loginError, setLoginError] = useState('');
   useEffect(() => {
     if (provider && code) {
       load();
     }
   }, []);
   const load = useCallback(async () => {
-    const { token } = await (
-      await fetch(`/auth/oauth/${provider?.toUpperCase() || 'LOCAL'}/exists`, {
-        method: 'POST',
-        body: JSON.stringify({
-          code,
-          state,
-        }),
-      })
-    ).json();
-    if (token) {
-      setCode(token);
-      setShow(true);
+    try {
+      const response = await fetch(
+        `/auth/oauth/${provider?.toUpperCase() || 'LOCAL'}/exists`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ code, state }),
+        },
+      );
+      if (!response.ok) {
+        setLoginError(
+          response.status === 403
+            ? "Your workspace isn't set up yet. Ask your PRESHos administrator to check your tenant membership and Social connection."
+            : 'PRESHos sign-in is temporarily unavailable. Please try again.',
+        );
+        return;
+      }
+      const { token } = await response.json();
+      if (token) {
+        setCode(token);
+        setShow(true);
+      }
+    } catch {
+      setLoginError(
+        'PRESHos sign-in is temporarily unavailable. Please try again.',
+      );
     }
-  }, [provider, code]);
+  }, [provider, code, state, fetch]);
   if (!code && !provider) {
     return <RegisterAfter token="" provider="LOCAL" />;
+  }
+  if (loginError) {
+    return (
+      <div role="alert" className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold">Unable to sign in</h1>
+        <p>{loginError}</p>
+        <Link href="/auth/login">Back to sign in</Link>
+      </div>
+    );
   }
   if (!show) {
     return <LoadingComponent />;
@@ -224,7 +247,7 @@ export function RegisterAfter({
               <div className={clsx('text-[12px]')}>
                 {t(
                   'by_registering_you_agree_to_our',
-                  'By registering you agree to our'
+                  'By registering you agree to our',
                 )}
                 &nbsp;
                 <a

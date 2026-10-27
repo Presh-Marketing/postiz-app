@@ -5,6 +5,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Provider, Role } from '@prisma/client';
+import { provisionPreshosUser, PreshosIdentity, PreshosMembership } from './preshos-user';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
@@ -16,6 +17,21 @@ export class UsersRepository {
     private _user: PrismaRepository<'user'>,
     private _transaction: PrismaTransaction
   ) {}
+
+  async loginPreshosUser(identity: PreshosIdentity, membership: PreshosMembership) {
+    // Serializable transaction + bounded retry prevents duplicate first-login
+    // users when callbacks race (including email matches across providers).
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this._transaction.model.$transaction(
+          (tx) => provisionPreshosUser(tx, identity, membership),
+          { isolationLevel: 'Serializable' }
+        );
+      } catch (error) {
+        if (attempt >= 2 || !['P2034', 'P2002'].includes(error?.code)) throw error;
+      }
+    }
+  }
 
   async switchUserCredentials(currentUserId: string, targetUserId: string) {
     const current = await this._user.model.user.findUnique({

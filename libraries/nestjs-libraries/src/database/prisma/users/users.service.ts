@@ -1,6 +1,7 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
 import { Provider, Role } from '@prisma/client';
+import { PreshosIdentity, PreshosMembership } from './preshos-user';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
@@ -17,6 +18,10 @@ export class UsersService {
   ) {}
 
   private readonly _logger = new Logger(UsersService.name);
+
+  loginPreshosUser(identity: PreshosIdentity, membership: PreshosMembership) {
+    return this._usersRepository.loginPreshosUser(identity, membership);
+  }
 
   getUserByEmail(email: string) {
     return this._usersRepository.getUserByEmail(email);

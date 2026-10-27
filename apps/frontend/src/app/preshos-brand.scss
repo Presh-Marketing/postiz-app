@@ -1,0 +1,48 @@
+/* Generated from PRESHos 8bbfd1298a3abfca6778a5e575219447b17ed53e; run scripts/sync-preshos-brand.mjs. */
+:root .dark,
+:root .light {
+  --presh-brand: hsl(180 78% 54%);
+  --presh-brand-hover: hsl(181 67% 45%);
+  --presh-ink: #0b0f14;
+  --new-bgColor: hsl(180 2% 8.5%);
+  --new-bgColorInner: hsl(0 0% 11%);
+  --new-border: hsl(0 0% 16.5%);
+  --new-btn-primary: var(--presh-brand);
+  --new-ai-btn: var(--presh-brand-hover);
+  --new-textColor: 250 250 250;
+  --new-btn-text: hsl(0 0% 98%);
+  --new-settings: hsl(0 0% 12%);
+  --new-box-hover: hsl(0 0% 12%);
+  --new-table-border: hsl(0 0% 16.5%);
+  --new-table-header: hsl(0 0% 11%);
+  --new-table-text-focused: var(--presh-brand);
+  --color-custom50: var(--presh-brand);
+  --color-forth: var(--presh-brand);
+}
+.preshos-auth {
+  background: var(--new-bgColor);
+}
+.preshos-auth-panel {
+  background: var(--new-bgColorInner);
+}
+.preshos-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--new-btn-text);
+}
+.bg-btnPrimary,
+.bg-forth {
+  color: var(--presh-ink);
+}
+.preshos-auth a {
+  color: var(--presh-brand);
+}
+.preshos-auth input:focus-visible,
+.preshos-auth button:focus-visible,
+.preshos-auth a:focus-visible {
+  outline: 2px solid var(--presh-brand) !important;
+  outline-offset: 3px;
+}

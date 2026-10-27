@@ -30,8 +30,8 @@ export const OauthProvider = () => {
     >
       <div>
         <SafeImage
-          src={oauthLogoUrl || '/icons/generic-oauth.svg'}
-          alt="genericOauth"
+          src={oauthLogoUrl || '/preshos/icon.svg'}
+          alt="PRESHos"
           width={40}
           height={40}
           className="-mt-[7px]"
@@ -39,7 +39,7 @@ export const OauthProvider = () => {
       </div>
       <div>
         {t('sign_in_with', 'Sign in with')}&nbsp;
-        {oauthDisplayName || 'OAuth'}
+        {oauthDisplayName || 'PRESHos'}
       </div>
     </div>
   );
