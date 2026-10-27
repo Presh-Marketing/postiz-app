@@ -109,7 +109,10 @@ export class AuthController {
       }
 
       Sentry.metrics.count('new_user', 1);
-      response.header(body.provider === Provider.GENERIC ? 'reload' : 'onboarding', 'true');
+      response.header(
+        body.provider === Provider.GENERIC ? 'reload' : 'onboarding',
+        'true'
+      );
       response.status(200).json({
         register: true,
       });
@@ -359,8 +362,37 @@ export class AuthController {
     if ('token' in result) {
       return response.json({ token: result.token });
     }
+    if ('workspaces' in result) return response.json(result);
+    return this.completeOauthLogin(response, result);
+  }
+
+  @Post('/preshos/workspace')
+  async selectPreshosWorkspace(
+    @Req() req: Request,
+    @Body('selectionToken') selectionToken: string,
+    @Body('tenantId') tenantId: number,
+    @Res({ passthrough: false }) response: Response
+  ) {
+    if (!req.headers['content-type']?.includes('application/json')) {
+      return response.status(400).send('Invalid request');
+    }
+    const result = await this._authService.selectPreshosWorkspace(
+      selectionToken,
+      tenantId,
+      req?.cookies?.oauth_state
+    );
+    response.clearCookie('oauth_state', {
+      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+    });
+    return this.completeOauthLogin(response, result);
+  }
+
+  private completeOauthLogin(
+    response: Response,
+    result: { jwt: string; addedOrg?: { organizationId: string } }
+  ) {
     const { jwt } = result;
-    if ('addedOrg' in result) {
+    if (result.addedOrg) {
       response.cookie('showorg', result.addedOrg.organizationId, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
         secure: !process.env.NOT_SECURED,
@@ -368,7 +400,8 @@ export class AuthController {
         sameSite: process.env.NOT_SECURED ? 'lax' : 'none',
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
       });
-      if (process.env.NOT_SECURED) response.header('showorg', result.addedOrg.organizationId);
+      if (process.env.NOT_SECURED)
+        response.header('showorg', result.addedOrg.organizationId);
     }
 
     response.cookie('auth', jwt, {

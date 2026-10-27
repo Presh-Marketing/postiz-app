@@ -33,7 +33,7 @@ beforeEach(() => {
 test('existing provider user joins exactly the tenant org and refreshes role', async () => {
   const tx = database([{ id: 'existing' }]);
   expect((await provisionPreshosUser(tx as any, identity, membership)).id).toBe(
-    'existing',
+    'existing'
   );
   expect(tx.user.create).not.toHaveBeenCalled();
   expect(tx.userOrganization.upsert).toHaveBeenCalledWith({
@@ -55,7 +55,7 @@ test('existing provider user joins exactly the tenant org and refreshes role', a
 test('new OAuth identity reuses verified email without overwriting existing credentials', async () => {
   const tx = database([], [{ id: 'local-user', providerName: 'LOCAL' }]);
   expect((await provisionPreshosUser(tx as any, identity, membership)).id).toBe(
-    'local-user',
+    'local-user'
   );
   expect(tx.user.create).not.toHaveBeenCalled();
   expect(tx.user.findMany.mock.calls[1][0].where.email).toEqual({
@@ -75,10 +75,10 @@ test('new user without email match is created with membership and no personal or
     }),
   });
   expect(tx.user.create.mock.calls[0][0].data).not.toHaveProperty(
-    'organizations',
+    'organizations'
   );
   expect(
-    tx.userOrganization.upsert.mock.calls[0][0].create.organizationId,
+    tx.userOrganization.upsert.mock.calls[0][0].create.organizationId
   ).toBe(membership.postizOrgId);
 });
 test('unverified email cannot take over an existing account', async () => {
@@ -86,7 +86,7 @@ test('unverified email cannot take over an existing account', async () => {
   await provisionPreshosUser(
     tx as any,
     { ...identity, emailVerified: false },
-    membership,
+    membership
   );
   expect(tx.user.findMany).toHaveBeenCalledTimes(1);
   expect(tx.user.create).toHaveBeenCalled();
@@ -95,7 +95,7 @@ test('missing Postiz workspace causes no user or membership write', async () => 
   const tx = database();
   tx.organization.findFirst.mockResolvedValue(null);
   await expect(
-    provisionPreshosUser(tx as any, identity, membership),
+    provisionPreshosUser(tx as any, identity, membership)
   ).rejects.toThrow("workspace isn't set up yet");
   expect(tx.user.create).not.toHaveBeenCalled();
   expect(tx.userOrganization.upsert).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ test('ambiguous email and another bound WorkOS id are refused', async () => {
   ]) {
     const tx = database([], matches);
     await expect(
-      provisionPreshosUser(tx as any, identity, membership),
+      provisionPreshosUser(tx as any, identity, membership)
     ).rejects.toThrow();
     expect(tx.userOrganization.upsert).not.toHaveBeenCalled();
   }
@@ -117,8 +117,8 @@ for (const status of [403, 404])
     await expect(
       resolvePreshosMembership(
         identity,
-        jest.fn().mockResolvedValue(new Response('{}', { status })),
-      ),
+        jest.fn().mockResolvedValue(new Response('{}', { status }))
+      )
     ).rejects.toThrow("workspace isn't set up yet");
   });
 test('only sends identity by POST with secret header and rejects redirects', async () => {
@@ -129,7 +129,7 @@ test('only sends identity by POST with secret header and rejects redirects', asy
   expect(init.method).toBe('POST');
   expect(init.redirect).toBe('error');
   expect(init.headers['x-preshos-membership-secret']).toBe(
-    process.env.PRESHOS_MEMBERSHIP_SECRET,
+    process.env.PRESHOS_MEMBERSHIP_SECRET
   );
   expect(JSON.parse(init.body)).toEqual({
     workos_user_id: identity.id,
@@ -140,7 +140,7 @@ test('misconfiguration, outages and malformed responses fail closed', async () =
   const request = jest.fn();
   delete process.env.PRESHOS_MEMBERSHIP_SECRET;
   await expect(resolvePreshosMembership(identity, request)).rejects.toThrow(
-    'temporarily unavailable',
+    'temporarily unavailable'
   );
   expect(request).not.toHaveBeenCalled();
   process.env.PRESHOS_MEMBERSHIP_SECRET = 'test-only-secret-'.repeat(4);
@@ -150,15 +150,59 @@ test('misconfiguration, outages and malformed responses fail closed', async () =
     Response.json({ postizOrgId: 'bad', role: 'USER' }),
   ]) {
     await expect(
-      resolvePreshosMembership(identity, jest.fn().mockResolvedValue(result)),
+      resolvePreshosMembership(identity, jest.fn().mockResolvedValue(result))
     ).rejects.toThrow('temporarily unavailable');
   }
+});
+
+test('workspace choices contain only validated tenant IDs and names', async () => {
+  const workspaces = [
+    { tenantId: 42, name: 'First tenant' },
+    { tenantId: 84, name: 'Second tenant' },
+  ];
+  expect(
+    await resolvePreshosMembership(
+      identity,
+      jest.fn().mockResolvedValue(Response.json({ workspaces }))
+    )
+  ).toEqual({ workspaces });
+  for (const invalid of [
+    [],
+    [{ tenantId: -1, name: 'Invalid' }],
+    [workspaces[0], workspaces[0]],
+  ]) {
+    await expect(
+      resolvePreshosMembership(
+        identity,
+        jest.fn().mockResolvedValue(Response.json({ workspaces: invalid }))
+      )
+    ).rejects.toThrow('temporarily unavailable');
+  }
+});
+test('selected tenant is sent back to PRESHos and a second choice list is refused', async () => {
+  const request = jest.fn().mockResolvedValue(Response.json(membership));
+  await resolvePreshosMembership(identity, request, 84);
+  expect(JSON.parse(request.mock.calls[0][1].body).tenant_id).toBe(84);
+  await expect(
+    resolvePreshosMembership(
+      identity,
+      jest.fn().mockResolvedValue(
+        Response.json({
+          workspaces: [
+            { tenantId: 42, name: 'First' },
+            { tenantId: 84, name: 'Second' },
+          ],
+        })
+      ),
+      84
+    )
+  ).rejects.toThrow('temporarily unavailable');
 });
 
 test('verified email completes pending local email activation', async () => {
   const tx = database(
     [],
-    [{ id: 'local-user', providerName: 'LOCAL', activated: false }],
+    [{ id: 'local-user', providerName: 'LOCAL', activated: false }]
   );
   const update = jest
     .fn()

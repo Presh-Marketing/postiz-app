@@ -39,10 +39,13 @@ one existing workspace (for PRESH, the PRESHai workspace with its LinkedIn
 channel), without a company-name form or a new empty workspace. Test an existing
 Postiz user and a first-time user; verified email matching retains the existing
 account's credentials. Confirm owner/admin → ADMIN and every other role → USER.
-Then test a user without an active membership, a tenant without an active Social
-connection, and a user with multiple active memberships: all must be refused.
-A multiple-tenant user needs a future tenant-choice contract; WorkOS userinfo
-currently has no tenant and this implementation never guesses. Membership and
+Then test a user without an active membership and a tenant without an active
+Social connection: both must be refused. A user with multiple active memberships
+chooses from their PRESHos tenant names before receiving an app session. The
+five-minute selection assertion is signed and bound to the initiating browser's
+OAuth state cookie; it is sent only in a POST body. The selected tenant and its
+role are checked again by PRESHos, so tampering or revoked membership is refused.
+WorkOS userinfo has no tenant and this implementation never guesses. Membership and
 role refresh occur on sign-in, not continuously during existing Postiz sessions.
 
 Verify the login, navigation icon, PRESHos titles, cyan controls, Inter font and
@@ -69,7 +72,7 @@ Brand assets are bundled and never fetched at runtime from another tenant.
 
 ## Branch validation
 
-- 16 focused tests pass across membership, auth-flow and callback suites.
+- 24 focused tests pass across membership, auth-flow, callback, and workspace-choice suites.
 - Backend TypeScript checks pass.
 - Local browser checks confirm Inter, PRESHos assets and a 390px mobile layout without horizontal overflow.
 - Live WorkOS / Railway acceptance requires the approved rollout above.

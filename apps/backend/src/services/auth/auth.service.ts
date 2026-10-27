@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Provider, User } from '@prisma/client';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto';
@@ -8,6 +8,14 @@ import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
 import dayjs from 'dayjs';
 import { resolvePreshosMembership } from './preshos-membership';
+import {
+  createPreshosChoice,
+  readPreshosChoice,
+} from './preshos-workspace-choice';
+import type {
+  PreshosIdentity,
+  PreshosMembership,
+} from '@gitroom/nestjs-libraries/database/prisma/users/preshos-user';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
@@ -94,7 +102,9 @@ export class AuthService {
     // This fork's generic provider is exclusively PRESHos. Never fall back to
     // personal-org registration if the membership service is unconfigured.
     if (provider === Provider.GENERIC) {
-      const identity = await this._providerManager.getProvider(provider).getUser((body as CreateOrgUserDto).providerToken);
+      const identity = await this._providerManager
+        .getProvider(provider)
+        .getUser((body as CreateOrgUserDto).providerToken);
       if (!identity) throw new Error('Invalid provider token');
       return this.loginPreshos(identity, ip, userAgent);
     }
@@ -118,10 +128,52 @@ export class AuthService {
     return { addedOrg, jwt: await this.jwt(user) };
   }
 
-  private async loginPreshos(identity: { id: string; email: string; emailVerified?: boolean }, ip = '', userAgent = '') {
+  private async loginPreshos(
+    identity: { id: string; email: string; emailVerified?: boolean },
+    ip = '',
+    userAgent = ''
+  ) {
     const membership = await resolvePreshosMembership(identity);
-    const user = await this._userService.loginPreshosUser({ ...identity, ip, userAgent }, membership);
-    return { jwt: await this.jwt(user), addedOrg: { organizationId: membership.postizOrgId } };
+    if ('workspaces' in membership)
+      throw new ForbiddenException(
+        'Choose a workspace using Sign in with PRESHos.'
+      );
+    return this.completePreshosLogin(identity, membership, ip, userAgent);
+  }
+
+  private async completePreshosLogin(
+    identity: PreshosIdentity,
+    membership: PreshosMembership,
+    ip = '',
+    userAgent = ''
+  ) {
+    const user = await this._userService.loginPreshosUser(
+      { ...identity, ip, userAgent },
+      membership
+    );
+    return {
+      jwt: await this.jwt(user),
+      addedOrg: { organizationId: membership.postizOrgId },
+    };
+  }
+
+  async selectPreshosWorkspace(
+    token: string,
+    tenantId: number,
+    stateCookie?: string
+  ) {
+    if (!Number.isSafeInteger(tenantId) || tenantId <= 0)
+      throw new ForbiddenException('Invalid workspace selection.');
+    const identity = readPreshosChoice(token, stateCookie);
+    // Recheck current tenant membership and role; the choice token grants neither.
+    const membership = await resolvePreshosMembership(
+      identity,
+      undefined,
+      tenantId
+    );
+    if ('workspaces' in membership)
+      throw new ForbiddenException('Invalid workspace selection.');
+    return this.completePreshosLogin(identity, membership);
   }
 
   public getOrgFromCookie(cookie?: string) {
@@ -329,7 +381,18 @@ export class AuthService {
     }
     if (provider === Provider.GENERIC) {
       // Complete first-time sign-in here: no company-name onboarding form.
-      return this.loginPreshos(user);
+      const membership = await resolvePreshosMembership(user);
+      if ('workspaces' in membership) {
+        if (!state || state !== stateCookie)
+          throw new ForbiddenException(
+            'Start workspace selection from the sign-in page.'
+          );
+        return {
+          workspaces: membership.workspaces,
+          selectionToken: createPreshosChoice(user, state!),
+        };
+      }
+      return this.completePreshosLogin(user, membership);
     }
     const checkExists = await this._userService.getUserByProvider(
       user.id,
