@@ -73,6 +73,7 @@ test('choice response cannot issue an application session before selection', asy
   const service = { checkExists: jest.fn().mockResolvedValue(result) };
   const response: any = {
     cookie: jest.fn(),
+    header: jest.fn(),
     json: jest.fn(),
     status: jest.fn().mockReturnThis(),
   };
@@ -88,17 +89,16 @@ test('choice response cannot issue an application session before selection', asy
     response
   );
   expect(response.json).toHaveBeenCalledWith(result);
+  expect(response.header).toHaveBeenCalledWith('Cache-Control', 'no-store');
   expect(response.cookie).not.toHaveBeenCalled();
 });
 test('selection uses only the signed challenge, selected tenant, and browser nonce', async () => {
   process.env.FRONTEND_URL = 'https://social.example.test';
   const service = {
-    selectPreshosWorkspace: jest
-      .fn()
-      .mockResolvedValue({
-        jwt: 'fixture-jwt',
-        addedOrg: { organizationId: 'selected-workspace' },
-      }),
+    selectPreshosWorkspace: jest.fn().mockResolvedValue({
+      jwt: 'fixture-jwt',
+      addedOrg: { organizationId: 'selected-workspace' },
+    }),
   };
   const response: any = {
     cookie: jest.fn(),
@@ -128,6 +128,11 @@ test('selection uses only the signed challenge, selected tenant, and browser non
   );
   expect(response.clearCookie).toHaveBeenCalledWith(
     'oauth_state',
-    expect.any(Object)
+    expect.objectContaining({
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'none',
+    })
   );
 });

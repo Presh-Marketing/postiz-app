@@ -362,7 +362,10 @@ export class AuthController {
     if ('token' in result) {
       return response.json({ token: result.token });
     }
-    if ('workspaces' in result) return response.json(result);
+    if ('workspaces' in result) {
+      response.header('Cache-Control', 'no-store');
+      return response.json(result);
+    }
     return this.completeOauthLogin(response, result);
   }
 
@@ -383,6 +386,10 @@ export class AuthController {
     );
     response.clearCookie('oauth_state', {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+      path: '/',
+      ...(!process.env.NOT_SECURED
+        ? { secure: true, httpOnly: true, sameSite: 'none' as const }
+        : {}),
     });
     return this.completeOauthLogin(response, result);
   }
@@ -391,6 +398,7 @@ export class AuthController {
     response: Response,
     result: { jwt: string; addedOrg?: { organizationId: string } }
   ) {
+    response.header('Cache-Control', 'no-store');
     const { jwt } = result;
     if (result.addedOrg) {
       response.cookie('showorg', result.addedOrg.organizationId, {
