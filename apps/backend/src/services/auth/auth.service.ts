@@ -7,6 +7,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
 import dayjs from 'dayjs';
+import { resolvePreshosMembership } from './preshos-membership';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
@@ -90,6 +91,14 @@ export class AuthService {
       return { addedOrg: false, jwt: await this.jwt(user) };
     }
 
+    // This fork's generic provider is exclusively PRESHos. Never fall back to
+    // personal-org registration if the membership service is unconfigured.
+    if (provider === Provider.GENERIC) {
+      const identity = await this._providerManager.getProvider(provider).getUser((body as CreateOrgUserDto).providerToken);
+      if (!identity) throw new Error('Invalid provider token');
+      return this.loginPreshos(identity, ip, userAgent);
+    }
+
     const user = await this.loginOrRegisterProvider(
       provider,
       body as CreateOrgUserDto,
@@ -107,6 +116,12 @@ export class AuthService {
           )
         : false;
     return { addedOrg, jwt: await this.jwt(user) };
+  }
+
+  private async loginPreshos(identity: { id: string; email: string; emailVerified?: boolean }, ip = '', userAgent = '') {
+    const membership = await resolvePreshosMembership(identity);
+    const user = await this._userService.loginPreshosUser({ ...identity, ip, userAgent }, membership);
+    return { jwt: await this.jwt(user), addedOrg: { organizationId: membership.postizOrgId } };
   }
 
   public getOrgFromCookie(cookie?: string) {
@@ -311,6 +326,10 @@ export class AuthService {
     const user = await providerInstance.getUser(token);
     if (!user) {
       throw new Error('Invalid user');
+    }
+    if (provider === Provider.GENERIC) {
+      // Complete first-time sign-in here: no company-name onboarding form.
+      return this.loginPreshos(user);
     }
     const checkExists = await this._userService.getUserByProvider(
       user.id,

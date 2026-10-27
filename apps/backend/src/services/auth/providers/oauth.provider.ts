@@ -67,15 +67,14 @@ export class OauthProvider extends AuthProviderAbstract {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Token request failed: ${error}`);
+      throw new Error('OAuth token request failed');
     }
 
     const { access_token } = await response.json();
     return access_token;
   }
 
-  async getUser(access_token: string): Promise<{ email: string; id: string }> {
+  async getUser(access_token: string): Promise<{ email: string; id: string; emailVerified: boolean }> {
     const { userInfoUrl } = this.getConfig();
     const response = await fetch(`${userInfoUrl}`, {
       headers: {
@@ -85,11 +84,10 @@ export class OauthProvider extends AuthProviderAbstract {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`User info request failed: ${error}`);
+      throw new Error('OAuth user info request failed');
     }
 
-    const { email, sub: id } = await response.json();
-    return { email, id };
+    const { email, sub: id, email_verified } = await response.json();
+    return { email, id, emailVerified: email_verified === true };
   }
 }

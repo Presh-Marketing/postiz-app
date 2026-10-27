@@ -1,0 +1,20 @@
+{
+  "repository": "presh-marketing/preshos",
+  "sourceRef": "8bbfd1298a3abfca6778a5e575219447b17ed53e",
+  "font": "Inter",
+  "hashes": {
+    "app/globals.css": "1a5fe45a9f9eed00f7dee63f1fb1e5e161f7622e8d55aaad7aa9e25a8489cad6",
+    "tailwind.config.mjs": "c6d13b6c3d2c28607c8d8018f49a1f94d4c758f6a641ee006d5cc0c1d010aa7e",
+    "public/images/app-icon-primary.svg": "f818b5b2b5714624a76981fb321602d25910eeaf2a9e9bd0ab3ee683e73a7314",
+    "app/favicon.ico": "46b2ccd02f7175457974929dcfb88278cda9c2d8f9c9535af743ec155af35b42"
+  },
+  "values": {
+    "brand": "hsl(180 78% 54%)",
+    "brandHover": "hsl(181 67% 45%)",
+    "background": "hsl(180 2% 8.5%)",
+    "panel": "hsl(0 0% 11%)",
+    "border": "hsl(0 0% 16.5%)",
+    "text": "hsl(0 0% 98%)",
+    "muted": "hsl(0 0% 12%)"
+  }
+}

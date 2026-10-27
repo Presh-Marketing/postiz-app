@@ -109,7 +109,7 @@ export class AuthController {
       }
 
       Sentry.metrics.count('new_user', 1);
-      response.header('onboarding', 'true');
+      response.header(body.provider === Provider.GENERIC ? 'reload' : 'onboarding', 'true');
       response.status(200).json({
         register: true,
       });
@@ -348,7 +348,7 @@ export class AuthController {
       return response.status(400).send('Invalid request');
     }
 
-    const { jwt, token } = await this._authService.checkExists(
+    const result = await this._authService.checkExists(
       provider,
       code,
       redirect_uri,
@@ -356,8 +356,19 @@ export class AuthController {
       req?.cookies?.oauth_state
     );
 
-    if (token) {
-      return response.json({ token });
+    if ('token' in result) {
+      return response.json({ token: result.token });
+    }
+    const { jwt } = result;
+    if ('addedOrg' in result) {
+      response.cookie('showorg', result.addedOrg.organizationId, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        secure: !process.env.NOT_SECURED,
+        httpOnly: !process.env.NOT_SECURED,
+        sameSite: process.env.NOT_SECURED ? 'lax' : 'none',
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      });
+      if (process.env.NOT_SECURED) response.header('showorg', result.addedOrg.organizationId);
     }
 
     response.cookie('auth', jwt, {
